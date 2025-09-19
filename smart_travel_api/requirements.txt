@@ -1,0 +1,21 @@
+fastapi
+uvicorn
+pydantic
+qdrant-client
+transformers
+sentence-transformers
+duckduckgo-search
+crawl4ai
+playwright
+python-dotenv
+aiohttp
+langgraph==0.2.3
+httpx
+icalendar
+pillow
+event-bus  # New: Open-source event bus
+geopy  # New: Free geocoding with Nominatim
+scipy  # New: For SpeechT5 audio processing
+librosa  # New: For audio handling in TTS
+python-dateutil==2.8.2
+numpy==1.26.4
