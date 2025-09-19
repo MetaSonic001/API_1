@@ -1,7 +1,17 @@
 from fastapi import FastAPI
 from app.api.routes import travel, audio, moodboard, realtime, safety
+from smart_travel_api.services.event_bus import start_event_bus
 
 app = FastAPI()
+
+@app.on_event("startup")
+async def startup_event():
+    event_bus = start_event_bus()  # safe, loop exists now
+    print("Event bus initialized:", event_bus)
+    # You can store event_bus in app.state if needed
+    app.state.event_bus = event_bus
+    
+    
 
 # include routers
 app.include_router(travel.router, prefix="/travel", tags=["Travel"])

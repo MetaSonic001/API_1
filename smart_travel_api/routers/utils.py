@@ -2,6 +2,7 @@ from fastapi import APIRouter, Query
 from models.schemas import SafetyRequest, VerifyFactRequest
 from agents.safety import safety_agent
 from tools.search import web_search
+from fastapi import APIRouter, Body, Depends
 
 router = APIRouter()
 

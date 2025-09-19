@@ -1,0 +1,25 @@
+
+fastapi
+uvicorn
+pydantic
+python-multipart
+httpx
+asyncio
+python-dotenv
+loguru
+qdrant-client
+sentence-transformers
+transformers
+Pillow
+crawl4ai
+ollama
+websockets
+aiofiles
+python-jose
+passlib
+bcrypt
+openai-whisper # Free speech recognition
+pandas
+numpy
+dotenv
+pydantic-settings
