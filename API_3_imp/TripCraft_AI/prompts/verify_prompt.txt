@@ -1,0 +1,16 @@
+Given claim: "{claim}", return top {k} URLs that support or contradict it with a short snippet each and a confidence score [0-1]. 
+
+Prioritize authoritative sources:
+- Wikipedia, official museum pages
+- Government archives (.gov, .edu)  
+- Established travel authorities
+- Academic institutions
+
+Format each result as:
+URL: [url]
+Title: [title]
+Snippet: [relevant excerpt]
+Confidence: [0.0-1.0]
+Support: [supports/contradicts/neutral]
+
+Focus on factual accuracy over promotional content.

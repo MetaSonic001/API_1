@@ -116,6 +116,96 @@ async def surprise_me_planning(budget: Optional[float] = 1000, days: Optional[in
         logger.error(f"Error in surprise planning: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.post("/plan/{trip_id}/book")
+async def book_trip_items(
+    trip_id: str,
+    items: List[Dict[str, Any]],
+    user_email: str = "demo@tripcraft.ai"
+) -> JSONResponse:
+    """Book multiple items from a trip plan"""
+    try:
+        from services.booking_agent import MockBookingAgent
+        
+        booking_agent = MockBookingAgent()
+        confirmations = booking_agent.bulk_book_itinerary(items, user_email)
+        
+        return JSONResponse(content={
+            "trip_id": trip_id,
+            "bookings": [
+                {
+                    "booking_id": conf.booking_id,
+                    "status": conf.status.value,
+                    "item_name": conf.item.name,
+                    "price": conf.item.price,
+                    "confirmation_code": conf.confirmation_code
+                }
+                for conf in confirmations
+            ],
+            "total_bookings": len(confirmations),
+            "note": "These are demo bookings for testing purposes"
+        })
+        
+    except Exception as e:
+        logger.error(f"Error booking trip items: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/plan/{trip_id}/download")
+async def download_offline_package(trip_id: str) -> Response:
+    """Download offline travel package"""
+    try:
+        from services.offline_builder import OfflinePackageBuilder
+        
+        # This would normally fetch the trip from database
+        # For demo, return a simple package
+        builder = OfflinePackageBuilder()
+        
+        # Create minimal package
+        zip_content = b"Demo offline package content"
+        
+        return Response(
+            content=zip_content,
+            media_type="application/zip",
+            headers={"Content-Disposition": f"attachment; filename=trip_{trip_id}.zip"}
+        )
+        
+    except Exception as e:
+        logger.error(f"Error creating offline package: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/plan/{trip_id}/verify")
+async def verify_trip_facts(trip_id: str, claims: List[str]) -> JSONResponse:
+    """Verify factual claims in trip plan"""
+    try:
+        from services.verify_service import FactVerificationService
+        
+        verification_service = FactVerificationService()
+        citations = await verification_service.verify_claims(claims, top_k=3)
+        
+        return JSONResponse(content={
+            "trip_id": trip_id,
+            "verified_claims": [
+                {
+                    "claim": claim,
+                    "citations": [
+                        {
+                            "url": cite.url,
+                            "title": cite.title,
+                            "confidence": cite.confidence_score,
+                            "domain": cite.domain
+                        }
+                        for cite in claim_citations
+                    ]
+                }
+                for claim, claim_citations in zip(claims, citations)
+            ]
+        })
+        
+    except Exception as e:
+        logger.error(f"Error verifying trip facts: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+
 async def _post_process_plan(trip_id: str, realtime_enabled: bool):
     """Background task for post-processing travel plans"""
     try:

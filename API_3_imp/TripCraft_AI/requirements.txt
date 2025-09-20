@@ -23,3 +23,11 @@ pandas
 numpy
 dotenv
 pydantic-settings
+
+
+icalendar==5.0.11
+folium
+beautifulsoup4
+duckduckgo-search
+tenacity
+pytz
