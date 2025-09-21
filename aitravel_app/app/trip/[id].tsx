@@ -114,6 +114,7 @@ export default function TripDetailsScreen() {
   }, [id]); // runs when 'id' changes
   
 
+<<<<<<< HEAD
   // Handle real-time updates
   useEffect(() => {
     if (updates.length > 0) {
@@ -125,9 +126,173 @@ export default function TripDetailsScreen() {
       } else if (latestUpdate.type === 'transport_delay') {
         Alert.alert('Transport Update', latestUpdate.message);
       }
+=======
+  const loadTripDetails = async () => {
+    try {
+      setLoading(true);
+      
+      // Try to fetch real data from API first
+      try {
+        const realData = await api.getTripDetails(id!);
+        setTripDetails(realData);
+        return; // Success - exit early
+      } catch (apiError) {
+        console.log('API fetch failed, using demo data:', apiError);
+      }
+      
+      // Fallback to demo trip data
+      const demoTrip: TripDetails = {
+        trip_id: id!,
+        destination_info: {
+          name: 'Paris, France',
+          type: 'city',
+          coordinates: [2.3522, 48.8566],
+        },
+        summary: '6-day romantic and cultural journey through Paris',
+        total_duration_days: 6,
+        estimated_budget: {
+          total: 3000,
+          currency: 'USD',
+          transport: 900,
+          accommodation: 1200,
+          food: 600,
+          activities: 240,
+        },
+        daily_plans: [
+          {
+            date: '2024-06-01',
+            theme: 'Arrival and City Orientation',
+            morning: [
+              {
+                start_time: '09:00',
+                end_time: '12:00',
+                activity: 'Louvre Museum Visit',
+                location: {
+                  name: 'Louvre Museum',
+                  type: 'attraction',
+                  coordinates: [2.3376, 48.8606],
+                },
+                description: 'World\'s largest art museum with Mona Lisa and Venus de Milo. Skip-the-line tickets recommended.',
+                cost: 17.0,
+                booking_required: true,
+                verified_facts: [
+                  {
+                    fact: 'The Louvre receives over 9 million visitors annually',
+                    source: 'https://en.wikipedia.org/wiki/Louvre',
+                    confidence: 0.95,
+                  },
+                ],
+              },
+            ],
+            afternoon: [
+              {
+                start_time: '14:00',
+                end_time: '17:00',
+                activity: 'Seine River Cruise',
+                location: {
+                  name: 'Seine River',
+                  type: 'activity',
+                  coordinates: [2.3522, 48.8566],
+                },
+                description: 'Scenic boat cruise along the Seine with views of Notre-Dame and other landmarks.',
+                cost: 15.0,
+                booking_required: false,
+              },
+            ],
+            evening: [
+              {
+                start_time: '19:00',
+                end_time: '21:00',
+                activity: 'Dinner at Local Bistro',
+                location: {
+                  name: 'Le Comptoir du 7ème',
+                  type: 'restaurant',
+                  coordinates: [2.3084, 48.8534],
+                },
+                description: 'Authentic French bistro with seasonal menu and excellent wine selection.',
+                cost: 85.0,
+                booking_required: true,
+              },
+            ],
+            total_cost: 185.0,
+          },
+          // Add more days...
+        ],
+        audio_tour_segments: [
+          {
+            location: 'Eiffel Tower',
+            content: 'Standing before this iron lattice tower, you\'re witnessing Gustave Eiffel\'s masterpiece...',
+            duration_minutes: 5,
+            voice_style: 'friendly_guide',
+          },
+        ],
+        safety_info: {
+          general_safety: ['Stay aware of pickpockets in tourist areas'],
+          health_advisories: ['No special vaccinations required'],
+          emergency_contacts: { emergency: '112', police: '17' },
+        },
+        verification_status: 'facts_verified',
+        confidence_score: 0.85,
+      };
+      
+      setTripDetails(demoTrip);
+    } catch (error) {
+      Alert.alert('Error', 'Failed to load trip details');
+    } finally {
+      setLoading(false);
+>>>>>>> 9234435603d69504b562abeb424110f58bf15497
     }
   }, [updates]);
 
+<<<<<<< HEAD
+=======
+  const setupWebSocket = () => {
+    // Don't create multiple WebSocket connections
+    if (websocket && websocket.readyState === WebSocket.OPEN) {
+      return;
+    }
+    
+    if (id) {
+      try {
+        const ws = api.createWebSocketConnection(id);
+        
+        ws.onmessage = (event) => {
+          const update = JSON.parse(event.data);
+          handleRealtimeUpdate(update);
+        };
+        
+        ws.onerror = (error) => {
+          console.error('WebSocket error:', error);
+        };
+        
+        ws.onclose = () => {
+          console.log('WebSocket connection closed');
+          // Don't automatically reconnect to prevent connection spam
+        };
+        
+        setWebsocket(ws);
+      } catch (error) {
+        console.error('Failed to create WebSocket connection:', error);
+      }
+    }
+  };
+
+  const handleRealtimeUpdate = (update: any) => {
+    switch (update.type) {
+      case 'weather_alert':
+        Alert.alert('Weather Alert', update.message);
+        break;
+      case 'venue_closure':
+        Alert.alert('Venue Update', update.message);
+        break;
+      case 'transport_delay':
+        Alert.alert('Transport Update', update.message);
+        break;
+      default:
+        break;
+    }
+  };
+>>>>>>> 9234435603d69504b562abeb424110f58bf15497
 
   const shareTrip = async () => {
     if (!tripData) return;

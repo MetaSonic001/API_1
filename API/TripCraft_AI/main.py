@@ -20,6 +20,7 @@ from api.multimodal import router as multimodal_router
 from api.realtime import router as realtime_router
 from config.settings import get_settings
 from utils.logger import setup_logger
+from services.ollama_manager import ollama_manager
 
 # Setup logger
 logger = setup_logger()
@@ -39,25 +40,40 @@ async def lifespan(app: FastAPI):
     """Application startup and shutdown events"""
     logger.info("Starting TripCraft AI Application...")
     
-    # Initialize services on startup
+    # Initialize services on startup with error handling
     try:
-        from services.travel_service import TravelPlanningService
-        from tools.vector_store import VectorStore
+        # Warm up Ollama model first
+        try:
+            logger.info("Warming up Ollama model...")
+            await ollama_manager.ensure_model_ready()
+            logger.info("Ollama model ready for use")
+        except Exception as e:
+            logger.warning(f"Ollama warm-up failed (non-critical): {e}")
         
-        # Initialize vector store
-        vector_store = VectorStore()
-        await vector_store.initialize()
+        # Try to initialize core services but don't fail if they're not available
+        try:
+            from tools.vector_store import VectorStore
+            vector_store = VectorStore()
+            await vector_store.initialize()
+            logger.info("Vector store initialized successfully")
+        except Exception as e:
+            logger.warning(f"Vector store initialization failed (non-critical): {e}")
         
-        # Initialize travel service
-        travel_service = TravelPlanningService()
+        try:
+            from services.travel_service import TravelPlanningService
+            travel_service = TravelPlanningService()
+            logger.info("Travel service initialized successfully")
+        except Exception as e:
+            logger.warning(f"Travel service initialization failed (non-critical): {e}")
         
-        logger.info("Services initialized successfully")
+        logger.info("Application startup completed (some services may be in fallback mode)")
         
         yield
         
     except Exception as e:
-        logger.error(f"Error during startup: {e}")
-        raise
+        logger.error(f"Critical error during startup: {e}")
+        # Don't raise - allow app to start in degraded mode
+        yield
     finally:
         logger.info("Shutting down TripCraft AI Application...")
 
@@ -112,7 +128,7 @@ async def health_check():
 if __name__ == "__main__":
     settings = get_settings()
     uvicorn.run(
-        "main:app",
+        "main:app" if settings.DEBUG else app,
         host="0.0.0.0",
         port=8000,
         reload=settings.DEBUG,

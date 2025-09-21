@@ -1,14 +1,13 @@
 """
 api/travel.py - Travel Planning API Endpoints
 """
-from fastapi import APIRouter, HTTPException, BackgroundTasks, UploadFile, File
+from fastapi import APIRouter, HTTPException, BackgroundTasks, UploadFile, File, Request
 from fastapi.responses import JSONResponse
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from models.travel_request import TravelPlanningRequest, TravelMode
 from models.travel_response import TravelPlanResponse, ReplanningRequest
 from services.travel_service import TravelPlanningService
 from utils.logger import get_logger
-from typing import Dict, Any
 from fastapi.responses import Response
 
 logger = get_logger(__name__)
@@ -16,6 +15,8 @@ router = APIRouter()
 
 # Initialize service
 travel_service = TravelPlanningService()
+
+# Rate limiting and IP blocking removed per user request
 
 @router.post("/plan", response_model=TravelPlanResponse)
 async def create_travel_plan(
@@ -44,14 +45,174 @@ async def create_travel_plan(
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/plan/{trip_id}")
-async def get_travel_plan(trip_id: str) -> TravelPlanResponse:
+async def get_travel_plan(trip_id: str, request: Request) -> TravelPlanResponse:
     """Get existing travel plan by ID"""
     try:
-        # Implementation would fetch from database
-        raise HTTPException(status_code=404, detail="Plan not found")
+        # Get client IP for logging
+        client_ip = request.client.host if request.client else "unknown"
+        
+        logger.info(f"Fetching travel plan: {trip_id} from IP: {client_ip}")
+        
+        # Check if it's a demo plan
+        if trip_id.startswith("demo-"):
+            return await _get_demo_plan(trip_id)
+        
+        # For now, return a basic error since storage isn't implemented
+        # In a real implementation, this would fetch from database
+        logger.warning(f"Travel plan storage not implemented yet for: {trip_id}")
+        raise HTTPException(status_code=404, detail=f"Plan {trip_id} not found - storage not implemented")
+        
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
     except Exception as e:
         logger.error(f"Error fetching travel plan {trip_id}: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+async def _get_demo_plan(trip_id: str) -> TravelPlanResponse:
+    """Return a demo travel plan for testing"""
+    from datetime import datetime, timedelta, date
+    from models.travel_response import (
+        LocationInfo, BudgetBreakdown, SafetyInfo, DayPlan, 
+        ActivityBlock, AccommodationOption, DiningOption, TransportOption
+    )
+    
+    demo_plans = {
+        "demo-paris-001": {
+            "destination": "Paris, France",
+            "summary": "A 3-day cultural and culinary adventure in the City of Light",
+            "start_date": datetime.now().date(),
+            "end_date": (datetime.now() + timedelta(days=3)).date(),
+        }
+    }
+    
+    if trip_id in demo_plans:
+        plan_data = demo_plans[trip_id]
+        
+        # Create destination info
+        destination_info = LocationInfo(
+            name=plan_data["destination"],
+            coordinates=[48.8566, 2.3522],  # Paris coordinates
+            type="city"
+        )
+        
+        # Create budget breakdown
+        budget = BudgetBreakdown(
+            total=750.0,
+            currency="EUR",
+            transport=150.0,
+            accommodation=300.0,
+            food=200.0,
+            activities=75.0,
+            shopping=25.0,
+            contingency=0.0
+        )
+        
+        # Create safety info
+        safety_info = SafetyInfo(
+            general_safety=["Keep belongings secure", "Be aware of pickpockets in tourist areas"],
+            health_advisories=["No special health requirements"],
+            emergency_contacts={"Police": "17", "Medical": "15", "Fire": "18"},
+            accessibility_notes=["Most metro stations have elevator access", "Museums offer wheelchair access"]
+        )
+        
+        # Create activity blocks
+        eiffel_activity = ActivityBlock(
+            start_time="09:00",
+            end_time="11:00",
+            activity="Visit Eiffel Tower",
+            location=LocationInfo(name="Eiffel Tower", coordinates=[48.8584, 2.2945], type="landmark"),
+            description="Iconic iron tower with city views",
+            cost=25.0,
+            booking_required=True,
+            alternatives=["Trocadéro Gardens viewpoint"]
+        )
+        
+        louvre_activity = ActivityBlock(
+            start_time="14:00",
+            end_time="17:00",
+            activity="Louvre Museum",
+            location=LocationInfo(name="Louvre Museum", coordinates=[48.8606, 2.3376], type="museum"),
+            description="World's largest art museum",
+            cost=17.0,
+            booking_required=True,
+            alternatives=["Musée d'Orsay"]
+        )
+        
+        # Create daily plans
+        daily_plans = [
+            DayPlan(
+                date=plan_data["start_date"],
+                theme="Iconic Paris",
+                morning=[eiffel_activity],
+                afternoon=[louvre_activity],
+                evening=[],
+                total_cost=42.0,
+                travel_time_minutes=60
+            )
+        ]
+        
+        # Create accommodation options
+        accommodations = [
+            AccommodationOption(
+                name="Hotel Malte Opera",
+                type="hotel",
+                location=LocationInfo(name="Opera District", coordinates=[48.8706, 2.3355], type="area"),
+                price_per_night=120.0,
+                amenities=["WiFi", "24h Reception", "Breakfast"],
+                rating=4.2,
+                accessibility_features=["Elevator", "Wheelchair accessible rooms"]
+            )
+        ]
+        
+        # Create dining options
+        dining = [
+            DiningOption(
+                name="L'Ami Jean",
+                cuisine_type="French",
+                location=LocationInfo(name="7th Arrondissement", coordinates=[48.8584, 2.3055], type="area"),
+                price_range="€€€",
+                rating=4.5,
+                specialties=["Coq au vin", "Duck confit"],
+                dietary_options=["Vegetarian options available"]
+            )
+        ]
+        
+        # Create transport options
+        transport = [
+            TransportOption(
+                type="train",
+                provider="RER B",
+                departure_time=datetime.now(),
+                arrival_time=datetime.now() + timedelta(minutes=45),
+                duration_minutes=45,
+                price=12.0,
+                carbon_footprint="Low"
+            )
+        ]
+        
+        return TravelPlanResponse(
+            trip_id=trip_id,
+            destination_info=destination_info,
+            summary=plan_data["summary"],
+            total_duration_days=3,
+            estimated_budget=budget,
+            daily_plans=daily_plans,
+            transport_options=transport,
+            accommodation_options=accommodations,
+            dining_recommendations=dining,
+            audio_tour_segments=[],
+            ar_ready_pois=[],
+            safety_info=safety_info,
+            weather_forecast={},
+            live_events=[],
+            alternative_plans=[],
+            generated_at=datetime.now(),
+            confidence_score=0.85,
+            sources=["Demo data"]
+        )
+    else:
+        raise HTTPException(status_code=404, detail=f"Demo plan {trip_id} not found")
 
 @router.post("/plan/{trip_id}/replan")
 async def replan_trip(trip_id: str, request: ReplanningRequest) -> JSONResponse:
@@ -78,6 +239,17 @@ async def get_realtime_updates(trip_id: str):
 @router.post("/quick-start")
 async def quick_start_planning(location: Optional[str] = None):
     """Quick start planning based on current location"""
+    try:
+        # Quick start implementation
+        return {"message": "Quick start feature coming soon"}
+    except Exception as e:
+        logger.error(f"Error in quick start: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/quick-start")
+async def quick_start_plan(location: Optional[str] = None) -> TravelPlanResponse:
+    """Generate quick start travel plan for immediate exploration"""
     try:
         # Create quick start request
         request = TravelPlanningRequest(

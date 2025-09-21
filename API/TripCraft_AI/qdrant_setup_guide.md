@@ -10,9 +10,8 @@ The easiest way to run Qdrant locally:
 
 ```bash
 # Run Qdrant in Docker (no API key needed)
-docker run -p 6333:6333 -p 6334:6334 \
-  -v $(pwd)/qdrant_storage:/qdrant/storage \
-  qdrant/qdrant
+docker run -p 6333:6333 -p 6334:6334 -v C:/Users/shaun/Smart_Travel/API_1/API/TripCraft_AI/qdrant_storage:/qdrant/storage qdrant/qdrant
+
 ```
 
 **What this does:**

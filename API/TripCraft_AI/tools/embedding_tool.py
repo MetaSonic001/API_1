@@ -19,7 +19,8 @@ class EmbeddingTool:
         # Free image classification model
         self.image_classifier = pipeline(
             "image-classification", 
-            model="microsoft/resnet-50"
+            model="microsoft/resnet-50",
+            device=0 if torch.cuda.is_available() else -1
         )
         
         # Ollama embedding fallback
