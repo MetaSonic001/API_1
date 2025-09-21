@@ -12,6 +12,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import { useTripCraftAPI } from '../hooks/useTripCraftAPI';
 
 const { width } = Dimensions.get('window');
 
@@ -109,8 +110,11 @@ const DEMO_FEATURES = [
 export default function DemoScreen() {
   const [currentStep, setCurrentStep] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [demoResults, setDemoResults] = useState<any>(null);
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const slideAnim = useRef(new Animated.Value(0)).current;
+
+  const api = useTripCraftAPI();
 
   useEffect(() => {
     if (isPlaying) {
@@ -156,16 +160,56 @@ export default function DemoScreen() {
     setIsPlaying(!isPlaying);
   };
 
-  const handleActionPress = (step: DemoStep) => {
+  const handleActionPress = async (step: DemoStep) => {
     switch (step.action) {
       case 'Try Voice Planning':
-        router.push('/plan?mode=voice');
+        // Demo voice transcription
+        try {
+          const response = await api.transcribeVoice(
+            new Blob(['Demo voice input: I want to visit Paris for 5 days with a budget of $3000'], { type: 'audio/wav' })
+          );
+          if (response.success) {
+            setDemoResults({ type: 'voice', data: response.data });
+          }
+        } catch (error) {
+          console.log('Voice demo error:', error);
+        }
         break;
       case 'Try AR Experience':
         router.push('/ar');
         break;
       case 'See AI in Action':
-        router.push('/plan');
+        // Demo quick start planning
+        try {
+          const response = await api.quickStartPlanning('Paris, France');
+          if (response.success) {
+            setDemoResults({ type: 'quickstart', data: response.data });
+          }
+        } catch (error) {
+          console.log('Quick start demo error:', error);
+        }
+        break;
+      case 'View Live Updates':
+        // Demo real-time updates
+        try {
+          const response = await api.getRealtimeUpdates('demo-trip-id');
+          if (response.success) {
+            setDemoResults({ type: 'updates', data: response.data });
+          }
+        } catch (error) {
+          console.log('Updates demo error:', error);
+        }
+        break;
+      case 'Download Demo':
+        // Demo offline package download
+        try {
+          const response = await api.downloadOfflinePackage('demo-trip-id');
+          if (response.success) {
+            setDemoResults({ type: 'download', data: 'Offline package ready for download' });
+          }
+        } catch (error) {
+          console.log('Download demo error:', error);
+        }
         break;
       default:
         router.push('/plan');
@@ -272,12 +316,30 @@ export default function DemoScreen() {
         </View>
         
         <TouchableOpacity
-          style={styles.actionButton}
+          style={[styles.actionButton, api.loading && styles.actionButtonDisabled]}
           onPress={() => handleActionPress(currentDemoStep)}
+          disabled={api.loading}
         >
-          <Text style={styles.actionButtonText}>{currentDemoStep.action}</Text>
-          <Ionicons name="arrow-forward" size={20} color="#FFFFFF" />
+          {api.loading ? (
+            <>
+              <Ionicons name="hourglass-outline" size={20} color="#FFFFFF" />
+              <Text style={styles.actionButtonText}>Processing...</Text>
+            </>
+          ) : (
+            <>
+              <Text style={styles.actionButtonText}>{currentDemoStep.action}</Text>
+              <Ionicons name="arrow-forward" size={20} color="#FFFFFF" />
+            </>
+          )}
         </TouchableOpacity>
+
+        {/* Demo Results */}
+        {demoResults && (
+          <View style={styles.demoResults}>
+            <Text style={styles.demoResultsTitle}>Demo Result:</Text>
+            <Text style={styles.demoResultsText}>{demoResults.data}</Text>
+          </View>
+        )}
       </View>
 
       {/* Key Features */}
@@ -632,5 +694,27 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     marginLeft: 8,
+  },
+  actionButtonDisabled: {
+    opacity: 0.6,
+  },
+  demoResults: {
+    backgroundColor: '#F0F9FF',
+    padding: 16,
+    borderRadius: 12,
+    marginTop: 16,
+    borderLeftWidth: 4,
+    borderLeftColor: '#2563EB',
+  },
+  demoResultsTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#2563EB',
+    marginBottom: 8,
+  },
+  demoResultsText: {
+    fontSize: 14,
+    color: '#1F2937',
+    lineHeight: 20,
   },
 });

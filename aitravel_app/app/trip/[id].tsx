@@ -12,7 +12,9 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, router } from 'expo-router';
-import { TripCraftAPI } from '../../services/TripCraftAPI';
+import { useTravelPlan, useRealtimeUpdates } from '../../hooks/useTripCraftAPI';
+import { TravelPlanResponse } from '../../types/api';
+import { ErrorBoundary } from '../../components/ErrorBoundary';
 
 interface TripDetails {
   trip_id: string;
@@ -83,171 +85,57 @@ interface VerifiedFact {
 
 export default function TripDetailsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const [tripDetails, setTripDetails] = useState<TripDetails | null>(null);
-  const [loading, setLoading] = useState(true);
   const [selectedDay, setSelectedDay] = useState(0);
-  const [websocket, setWebsocket] = useState<WebSocket | null>(null);
-
-  const api = new TripCraftAPI();
+  
+  const { tripData, loadTrip, loading, error } = useTravelPlan(id);
+  const { updates, startRealtimeUpdates, stopRealtimeUpdates, isConnected } = useRealtimeUpdates(id || '');
 
   useEffect(() => {
-    loadTripDetails();
-    setupWebSocket();
+    if (id) {
+      startRealtimeUpdates();
+    }
     
     return () => {
-      if (websocket) {
-        websocket.close();
+      stopRealtimeUpdates();
+    };
+  }, [id]); // Removed startRealtimeUpdates and stopRealtimeUpdates from dependencies
+
+  useEffect(() => {
+    const fetchTrip = async () => {
+      try {
+        const res = await loadTrip(id); // your API call
+        console.log(res);
+      } catch (error) {
+        console.error(error);
       }
     };
-  }, [id]);
+  
+    fetchTrip();
+  }, [id]); // runs when 'id' changes
+  
 
-  const loadTripDetails = async () => {
-    try {
-      setLoading(true);
-      
-      // Demo trip data - in a real app, this would call the API
-      const demoTrip: TripDetails = {
-        trip_id: id!,
-        destination_info: {
-          name: 'Paris, France',
-          type: 'city',
-          coordinates: [2.3522, 48.8566],
-        },
-        summary: '6-day romantic and cultural journey through Paris',
-        total_duration_days: 6,
-        estimated_budget: {
-          total: 3000,
-          currency: 'USD',
-          transport: 900,
-          accommodation: 1200,
-          food: 600,
-          activities: 240,
-        },
-        daily_plans: [
-          {
-            date: '2024-06-01',
-            theme: 'Arrival and City Orientation',
-            morning: [
-              {
-                start_time: '09:00',
-                end_time: '12:00',
-                activity: 'Louvre Museum Visit',
-                location: {
-                  name: 'Louvre Museum',
-                  type: 'attraction',
-                  coordinates: [2.3376, 48.8606],
-                },
-                description: 'World\'s largest art museum with Mona Lisa and Venus de Milo. Skip-the-line tickets recommended.',
-                cost: 17.0,
-                booking_required: true,
-                verified_facts: [
-                  {
-                    fact: 'The Louvre receives over 9 million visitors annually',
-                    source: 'https://en.wikipedia.org/wiki/Louvre',
-                    confidence: 0.95,
-                  },
-                ],
-              },
-            ],
-            afternoon: [
-              {
-                start_time: '14:00',
-                end_time: '17:00',
-                activity: 'Seine River Cruise',
-                location: {
-                  name: 'Seine River',
-                  type: 'activity',
-                  coordinates: [2.3522, 48.8566],
-                },
-                description: 'Scenic boat cruise along the Seine with views of Notre-Dame and other landmarks.',
-                cost: 15.0,
-                booking_required: false,
-              },
-            ],
-            evening: [
-              {
-                start_time: '19:00',
-                end_time: '21:00',
-                activity: 'Dinner at Local Bistro',
-                location: {
-                  name: 'Le Comptoir du 7ème',
-                  type: 'restaurant',
-                  coordinates: [2.3084, 48.8534],
-                },
-                description: 'Authentic French bistro with seasonal menu and excellent wine selection.',
-                cost: 85.0,
-                booking_required: true,
-              },
-            ],
-            total_cost: 185.0,
-          },
-          // Add more days...
-        ],
-        audio_tour_segments: [
-          {
-            location: 'Eiffel Tower',
-            content: 'Standing before this iron lattice tower, you\'re witnessing Gustave Eiffel\'s masterpiece...',
-            duration_minutes: 5,
-            voice_style: 'friendly_guide',
-          },
-        ],
-        safety_info: {
-          general_safety: ['Stay aware of pickpockets in tourist areas'],
-          health_advisories: ['No special vaccinations required'],
-          emergency_contacts: { emergency: '112', police: '17' },
-        },
-        verification_status: 'facts_verified',
-        confidence_score: 0.85,
-      };
-      
-      setTripDetails(demoTrip);
-    } catch (error) {
-      Alert.alert('Error', 'Failed to load trip details');
-    } finally {
-      setLoading(false);
+  // Handle real-time updates
+  useEffect(() => {
+    if (updates.length > 0) {
+      const latestUpdate = updates[updates.length - 1];
+      if (latestUpdate.type === 'weather_alert') {
+        Alert.alert('Weather Alert', latestUpdate.message);
+      } else if (latestUpdate.type === 'venue_closure') {
+        Alert.alert('Venue Update', latestUpdate.message);
+      } else if (latestUpdate.type === 'transport_delay') {
+        Alert.alert('Transport Update', latestUpdate.message);
+      }
     }
-  };
+  }, [updates]);
 
-  const setupWebSocket = () => {
-    if (id) {
-      const ws = api.createWebSocketConnection(id);
-      
-      ws.onmessage = (event) => {
-        const update = JSON.parse(event.data);
-        handleRealtimeUpdate(update);
-      };
-      
-      ws.onerror = (error) => {
-        console.error('WebSocket error:', error);
-      };
-      
-      setWebsocket(ws);
-    }
-  };
-
-  const handleRealtimeUpdate = (update: any) => {
-    switch (update.type) {
-      case 'weather_alert':
-        Alert.alert('Weather Alert', update.message);
-        break;
-      case 'venue_closure':
-        Alert.alert('Venue Update', update.message);
-        break;
-      case 'transport_delay':
-        Alert.alert('Transport Update', update.message);
-        break;
-      default:
-        break;
-    }
-  };
 
   const shareTrip = async () => {
-    if (!tripDetails) return;
+    if (!tripData) return;
     
     try {
       await Share.share({
-        message: `Check out my ${tripDetails.total_duration_days}-day trip to ${tripDetails.destination_info.name}! ${tripDetails.summary}`,
-        title: `Trip to ${tripDetails.destination_info.name}`,
+        message: `Check out my ${tripData.total_duration_days}-day trip to ${tripData.destination_info.name}! ${tripData.summary}`,
+        title: `Trip to ${tripData.destination_info.name}`,
       });
     } catch (error) {
       console.error('Error sharing trip:', error);
@@ -294,7 +182,8 @@ export default function TripDetailsScreen() {
     }
   };
 
-  if (loading || !tripDetails) {
+  if (loading || !tripData) {
+    console.log(loading, tripData)
     return (
       <View style={styles.loadingContainer}>
         <Text>Loading trip details...</Text>
@@ -302,10 +191,11 @@ export default function TripDetailsScreen() {
     );
   }
 
-  const currentDay = tripDetails.daily_plans[selectedDay];
+  const currentDay = tripData.daily_plans[selectedDay];
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+    <ErrorBoundary>
+      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       {/* Header */}
       <LinearGradient
         colors={['#2563EB', '#1D4ED8']}
@@ -318,9 +208,9 @@ export default function TripDetailsScreen() {
           <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
         </TouchableOpacity>
         <View style={styles.headerContent}>
-          <Text style={styles.headerTitle}>{tripDetails.destination_info.name}</Text>
+          <Text style={styles.headerTitle}>{tripData.destination_info.name}</Text>
           <Text style={styles.headerSubtitle}>
-            {tripDetails.total_duration_days} days • {tripDetails.estimated_budget.currency} {tripDetails.estimated_budget.total.toLocaleString()}
+            {tripData.total_duration_days} days • {tripData.estimated_budget.currency} {tripData.estimated_budget.total.toLocaleString()}
           </Text>
           <View style={styles.headerActions}>
             <TouchableOpacity style={styles.headerActionButton} onPress={shareTrip}>
@@ -339,25 +229,25 @@ export default function TripDetailsScreen() {
       {/* Trip Summary */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Trip Overview</Text>
-        <Text style={styles.summary}>{tripDetails.summary}</Text>
+        <Text style={styles.summary}>{tripData.summary}</Text>
         <View style={styles.budgetBreakdown}>
           <Text style={styles.budgetTitle}>Budget Breakdown</Text>
           <View style={styles.budgetItems}>
             <View style={styles.budgetItem}>
               <Text style={styles.budgetLabel}>Transport</Text>
-              <Text style={styles.budgetValue}>${tripDetails.estimated_budget.transport}</Text>
+              <Text style={styles.budgetValue}>${tripData.estimated_budget.transport}</Text>
             </View>
             <View style={styles.budgetItem}>
               <Text style={styles.budgetLabel}>Accommodation</Text>
-              <Text style={styles.budgetValue}>${tripDetails.estimated_budget.accommodation}</Text>
+              <Text style={styles.budgetValue}>${tripData.estimated_budget.accommodation}</Text>
             </View>
             <View style={styles.budgetItem}>
               <Text style={styles.budgetLabel}>Food</Text>
-              <Text style={styles.budgetValue}>${tripDetails.estimated_budget.food}</Text>
+              <Text style={styles.budgetValue}>${tripData.estimated_budget.food}</Text>
             </View>
             <View style={styles.budgetItem}>
               <Text style={styles.budgetLabel}>Activities</Text>
-              <Text style={styles.budgetValue}>${tripDetails.estimated_budget.activities}</Text>
+              <Text style={styles.budgetValue}>${tripData.estimated_budget.activities}</Text>
             </View>
           </View>
         </View>
@@ -369,7 +259,7 @@ export default function TripDetailsScreen() {
         
         {/* Day Selector */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.daySelector}>
-          {tripDetails.daily_plans.map((day, index) => (
+          {tripData.daily_plans.map((day, index) => (
             <TouchableOpacity
               key={index}
               style={[styles.dayTab, selectedDay === index && styles.activeDayTab]}
@@ -479,10 +369,10 @@ export default function TripDetailsScreen() {
       </View>
 
       {/* Audio Tours */}
-      {tripDetails.audio_tour_segments.length > 0 && (
+      {tripData.audio_tour_segments.length > 0 && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Audio Tours</Text>
-          {tripDetails.audio_tour_segments.map((segment, index) => (
+          {tripData.audio_tour_segments.map((segment, index) => (
             <View key={index} style={styles.audioSegmentCard}>
               <View style={styles.audioSegmentHeader}>
                 <Ionicons name="volume-high" size={24} color="#7C3AED" />
@@ -507,13 +397,13 @@ export default function TripDetailsScreen() {
         <View style={styles.safetyCard}>
           <View style={styles.safetySection}>
             <Text style={styles.safetySubtitle}>General Safety</Text>
-            {tripDetails.safety_info.general_safety.map((tip, index) => (
+            {tripData.safety_info.general_advice.map((tip, index) => (
               <Text key={index} style={styles.safetyTip}>• {tip}</Text>
             ))}
           </View>
           <View style={styles.safetySection}>
             <Text style={styles.safetySubtitle}>Emergency Contacts</Text>
-            {Object.entries(tripDetails.safety_info.emergency_contacts).map(([key, value]) => (
+            {Object.entries(tripData.safety_info.emergency_contacts).map(([key, value]) => (
               <Text key={key} style={styles.emergencyContact}>
                 {key}: {value}
               </Text>
@@ -534,6 +424,7 @@ export default function TripDetailsScreen() {
         </TouchableOpacity>
       </View>
     </ScrollView>
+    </ErrorBoundary>
   );
 }
 

@@ -12,6 +12,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useTripCraftAPI } from '../../hooks/useTripCraftAPI';
 
 interface UserPreferences {
   notifications: boolean;
@@ -63,6 +64,8 @@ export default function ProfileScreen() {
     arAssets: 31,
   });
 
+  const api = useTripCraftAPI();
+
   useEffect(() => {
     loadUserPreferences();
     loadUserStats();
@@ -109,14 +112,27 @@ export default function ProfileScreen() {
         {
           text: 'Clear',
           style: 'destructive',
-          onPress: () => {
-            Alert.alert('Success', 'Cache cleared successfully!');
-            setStorageUsage({
-              totalSize: 32,
-              offlinePackages: 0,
-              audioTours: 0,
-              arAssets: 32,
-            });
+          onPress: async () => {
+            try {
+              await AsyncStorage.multiRemove([
+                'userTrips',
+                'userPreferences',
+                'userStats',
+                'offlinePackages',
+                'audioTours',
+                'arAssets'
+              ]);
+              
+              Alert.alert('Success', 'Cache cleared successfully!');
+              setStorageUsage({
+                totalSize: 32,
+                offlinePackages: 0,
+                audioTours: 0,
+                arAssets: 32,
+              });
+            } catch (error) {
+              Alert.alert('Error', 'Failed to clear cache');
+            }
           }
         }
       ]
@@ -138,11 +154,12 @@ export default function ProfileScreen() {
     title: string,
     description: string,
     key: keyof UserPreferences,
-    icon: string
+    icon: string,
+    color: string = '#059669'
   ) => (
     <View style={styles.preferenceItem}>
-      <View style={styles.preferenceIcon}>
-        <Ionicons name={icon as any} size={24} color="#2563EB" />
+      <View style={[styles.preferenceIcon, { backgroundColor: `${color}15` }]}>
+        <Ionicons name={icon as any} size={20} color={color} />
       </View>
       <View style={styles.preferenceContent}>
         <Text style={styles.preferenceTitle}>{title}</Text>
@@ -151,313 +168,489 @@ export default function ProfileScreen() {
       <Switch
         value={preferences[key] as boolean}
         onValueChange={(value) => savePreference(key, value)}
-        trackColor={{ false: '#F3F4F6', true: '#DBEAFE' }}
-        thumbColor={preferences[key] ? '#2563EB' : '#9CA3AF'}
+        trackColor={{ false: '#E2E8F0', true: `${color}30` }}
+        thumbColor={preferences[key] ? color : '#CBD5E1'}
+        ios_backgroundColor="#E2E8F0"
       />
     </View>
   );
 
   const renderStatCard = (title: string, value: string | number, icon: string, color: string) => (
     <View style={styles.statCard}>
-      <View style={[styles.statIcon, { backgroundColor: color }]}>
-        <Ionicons name={icon as any} size={24} color="#FFFFFF" />
-      </View>
+      <LinearGradient
+        colors={[color, `${color}CC`]}
+        style={styles.statIconGradient}
+      >
+        <Ionicons name={icon as any} size={20} color="#FFFFFF" />
+      </LinearGradient>
       <Text style={styles.statValue}>{value}</Text>
       <Text style={styles.statTitle}>{title}</Text>
     </View>
   );
 
+  const renderSettingItem = (
+    title: string,
+    value: string,
+    icon: string,
+    onPress: () => void,
+    color: string = '#64748B'
+  ) => (
+    <TouchableOpacity style={styles.settingItem} onPress={onPress}>
+      <View style={[styles.settingIcon, { backgroundColor: `${color}15` }]}>
+        <Ionicons name={icon as any} size={20} color={color} />
+      </View>
+      <View style={styles.settingContent}>
+        <Text style={styles.settingTitle}>{title}</Text>
+        <Text style={styles.settingValue}>{value}</Text>
+      </View>
+      <Ionicons name="chevron-forward" size={18} color="#CBD5E1" />
+    </TouchableOpacity>
+  );
+
+  const renderActionItem = (
+    title: string,
+    icon: string,
+    onPress: () => void,
+    color: string = '#64748B'
+  ) => (
+    <TouchableOpacity style={styles.actionItem} onPress={onPress}>
+      <View style={[styles.actionIcon, { backgroundColor: `${color}15` }]}>
+        <Ionicons name={icon as any} size={20} color={color} />
+      </View>
+      <Text style={styles.actionText}>{title}</Text>
+      <Ionicons name="chevron-forward" size={18} color="#CBD5E1" />
+    </TouchableOpacity>
+  );
+
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      {/* Profile Header */}
-      <LinearGradient
-        colors={['#2563EB', '#1D4ED8']}
-        style={styles.header}
+    <View style={styles.container}>
+      <ScrollView 
+        style={styles.scrollView} 
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
       >
-        <View style={styles.profileSection}>
-          <Image
-            source={{ uri: 'https://images.pexels.com/photos/771742/pexels-photo-771742.jpeg' }}
-            style={styles.avatar}
-          />
-          <View style={styles.profileInfo}>
-            <Text style={styles.profileName}>Travel Explorer</Text>
-            <Text style={styles.profileEmail}>explorer@tripcraft.ai</Text>
-            <View style={styles.profileBadge}>
-              <Ionicons name="star" size={16} color="#F59E0B" />
-              <Text style={styles.profileBadgeText}>Premium Member</Text>
+        {/* Enhanced Profile Header */}
+        <LinearGradient
+          colors={['#0F766E', '#059669', '#06B6D4']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.header}
+        >
+          <View style={styles.profileSection}>
+            <View style={styles.avatarContainer}>
+              <Image
+                source={{ uri: 'https://images.pexels.com/photos/771742/pexels-photo-771742.jpeg' }}
+                style={styles.avatar}
+              />
+              <TouchableOpacity style={styles.avatarEditButton}>
+                <Ionicons name="camera" size={14} color="#FFFFFF" />
+              </TouchableOpacity>
             </View>
+            
+            <View style={styles.profileInfo}>
+              <Text style={styles.profileName}>Alex Johnson</Text>
+              <Text style={styles.profileEmail}>alex.johnson@gmail.com</Text>
+              <View style={styles.profileBadge}>
+                <LinearGradient
+                  colors={['#F59E0B', '#F97316']}
+                  style={styles.badgeGradient}
+                >
+                  <Ionicons name="diamond" size={12} color="#FFFFFF" />
+                  <Text style={styles.profileBadgeText}>Premium Explorer</Text>
+                </LinearGradient>
+              </View>
+            </View>
+            
+            <TouchableOpacity style={styles.settingsButton}>
+              <Ionicons name="settings-outline" size={20} color="#FFFFFF" />
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity style={styles.editButton}>
-            <Ionicons name="create-outline" size={20} color="#FFFFFF" />
-          </TouchableOpacity>
-        </View>
-      </LinearGradient>
+        </LinearGradient>
 
-      {/* Travel Stats */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Travel Statistics</Text>
-        <View style={styles.statsGrid}>
-          {renderStatCard('Total Trips', stats.totalTrips, 'airplane', '#2563EB')}
-          {renderStatCard('Destinations', stats.totalDestinations, 'location', '#059669')}
-          {renderStatCard('Distance (km)', stats.totalDistance.toLocaleString(), 'speedometer', '#7C3AED')}
-          {renderStatCard('Avg Duration', `${stats.averageTripDuration}d`, 'time', '#F59E0B')}
-        </View>
-        
-        <View style={styles.additionalStats}>
-          <View style={styles.additionalStat}>
-            <Text style={styles.additionalStatLabel}>Favorite Type</Text>
-            <Text style={styles.additionalStatValue}>{stats.favoriteDestinationType}</Text>
-          </View>
-          <View style={styles.additionalStat}>
-            <Text style={styles.additionalStatLabel}>Budget Saved</Text>
-            <Text style={styles.additionalStatValue}>${stats.totalBudgetSaved}</Text>
-          </View>
-        </View>
-      </View>
-
-      {/* Preferences */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Preferences</Text>
-        {renderPreferenceSwitch(
-          'Push Notifications',
-          'Get notified about trip updates and reminders',
-          'notifications',
-          'notifications-outline'
-        )}
-        {renderPreferenceSwitch(
-          'Real-time Updates',
-          'Receive live weather, transport, and venue updates',
-          'realTimeUpdates',
-          'refresh-outline'
-        )}
-        {renderPreferenceSwitch(
-          'Offline Mode',
-          'Automatically download offline packages',
-          'offlineMode',
-          'cloud-download-outline'
-        )}
-        {renderPreferenceSwitch(
-          'Audio Tours',
-          'Include AI-generated audio tours in itineraries',
-          'audioTours',
-          'volume-high-outline'
-        )}
-        {renderPreferenceSwitch(
-          'AR Experience',
-          'Enable augmented reality features',
-          'arExperience',
-          'camera-outline'
-        )}
-        {renderPreferenceSwitch(
-          'Fact Verification',
-          'Verify all recommendations with citations',
-          'factVerification',
-          'shield-checkmark-outline'
-        )}
-      </View>
-
-      {/* Storage Usage */}
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Storage Usage</Text>
-          <TouchableOpacity onPress={clearCache}>
-            <Text style={styles.clearCacheButton}>Clear Cache</Text>
-          </TouchableOpacity>
-        </View>
-        
-        <View style={styles.storageCard}>
-          <View style={styles.storageHeader}>
-            <Ionicons name="server-outline" size={24} color="#6B7280" />
-            <Text style={styles.storageTitle}>Total Usage: {storageUsage.totalSize}MB</Text>
+        {/* Enhanced Travel Statistics */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Travel Journey</Text>
+            <TouchableOpacity>
+              <Text style={styles.viewAllText}>View Details</Text>
+            </TouchableOpacity>
           </View>
           
-          <View style={styles.storageBreakdown}>
-            <View style={styles.storageItem}>
-              <View style={styles.storageBar}>
-                <View
-                  style={[
-                    styles.storageBarFill,
-                    {
-                      width: `${(storageUsage.offlinePackages / storageUsage.totalSize) * 100}%`,
-                      backgroundColor: '#2563EB'
-                    }
-                  ]}
-                />
+          <View style={styles.statsGrid}>
+            {renderStatCard('Adventures', stats.totalTrips, 'airplane', '#059669')}
+            {renderStatCard('Countries', stats.totalDestinations, 'earth', '#7C3AED')}
+            {renderStatCard('Distance', `${(stats.totalDistance / 1000).toFixed(0)}K km`, 'speedometer', '#F59E0B')}
+            {renderStatCard('Avg Days', `${stats.averageTripDuration}`, 'time', '#06B6D4')}
+          </View>
+          
+          <View style={styles.achievementCard}>
+            <LinearGradient
+              colors={['#F8FAFC', '#FFFFFF']}
+              style={styles.achievementGradient}
+            >
+              <View style={styles.achievementHeader}>
+                <View style={styles.achievementIcon}>
+                  <Ionicons name="trophy" size={20} color="#F59E0B" />
+                </View>
+                <View style={styles.achievementContent}>
+                  <Text style={styles.achievementTitle}>Travel Achievements</Text>
+                  <Text style={styles.achievementSubtitle}>
+                    Favorite: {stats.favoriteDestinationType} • Saved: ${stats.totalBudgetSaved}
+                  </Text>
+                </View>
               </View>
-              <Text style={styles.storageLabel}>Offline Packages ({storageUsage.offlinePackages}MB)</Text>
+              
+              <View style={styles.achievementBadges}>
+                <View style={[styles.miniBadge, { backgroundColor: '#DCFCE7' }]}>
+                  <Text style={[styles.miniBadgeText, { color: '#059669' }]}>Culture Lover</Text>
+                </View>
+                <View style={[styles.miniBadge, { backgroundColor: '#FEF3C7' }]}>
+                  <Text style={[styles.miniBadgeText, { color: '#F59E0B' }]}>Budget Master</Text>
+                </View>
+              </View>
+            </LinearGradient>
+          </View>
+        </View>
+
+        {/* Enhanced Preferences */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Smart Preferences</Text>
+          <View style={styles.preferencesCard}>
+            {renderPreferenceSwitch(
+              'Smart Notifications',
+              'Intelligent trip updates and personalized reminders',
+              'notifications',
+              'notifications-outline',
+              '#059669'
+            )}
+            {renderPreferenceSwitch(
+              'Live Updates',
+              'Real-time weather, transport, and venue information',
+              'realTimeUpdates',
+              'refresh-outline',
+              '#06B6D4'
+            )}
+            {renderPreferenceSwitch(
+              'Auto Offline',
+              'Download offline packages automatically before trips',
+              'offlineMode',
+              'cloud-download-outline',
+              '#7C3AED'
+            )}
+            {renderPreferenceSwitch(
+              'Audio Tours',
+              'AI-narrated experiences at destinations',
+              'audioTours',
+              'volume-high-outline',
+              '#F59E0B'
+            )}
+            {renderPreferenceSwitch(
+              'AR Experience',
+              'Augmented reality features and interactive guides',
+              'arExperience',
+              'scan-outline',
+              '#EC4899'
+            )}
+            {renderPreferenceSwitch(
+              'Fact Verification',
+              'Verify recommendations with trusted sources',
+              'factVerification',
+              'shield-checkmark-outline',
+              '#10B981'
+            )}
+          </View>
+        </View>
+
+        {/* Enhanced Storage Management */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeaderWithAction}>
+            <Text style={styles.sectionTitle}>Storage Manager</Text>
+            <TouchableOpacity onPress={clearCache} style={styles.clearCacheButton}>
+              <Ionicons name="trash-outline" size={16} color="#DC2626" />
+              <Text style={styles.clearCacheText}>Clear Cache</Text>
+            </TouchableOpacity>
+          </View>
+          
+          <View style={styles.storageCard}>
+            <View style={styles.storageHeader}>
+              <View style={styles.storageMainInfo}>
+                <Text style={styles.storageSize}>{storageUsage.totalSize}MB</Text>
+                <Text style={styles.storageLabel}>Total Used</Text>
+              </View>
+              
+              <View style={styles.storageCircle}>
+                <View style={styles.storageCircleInner}>
+                  <Text style={styles.storagePercentage}>72%</Text>
+                </View>
+              </View>
             </View>
             
-            <View style={styles.storageItem}>
-              <View style={styles.storageBar}>
-                <View
-                  style={[
-                    styles.storageBarFill,
-                    {
-                      width: `${(storageUsage.audioTours / storageUsage.totalSize) * 100}%`,
-                      backgroundColor: '#059669'
-                    }
-                  ]}
-                />
+            <View style={styles.storageBreakdown}>
+              <View style={styles.storageItem}>
+                <View style={styles.storageItemHeader}>
+                  <View style={[styles.storageColorDot, { backgroundColor: '#059669' }]} />
+                  <Text style={styles.storageItemTitle}>Offline Packages</Text>
+                  <Text style={styles.storageItemSize}>{storageUsage.offlinePackages}MB</Text>
+                </View>
+                <View style={styles.storageBar}>
+                  <View
+                    style={[
+                      styles.storageBarFill,
+                      {
+                        width: `${(storageUsage.offlinePackages / storageUsage.totalSize) * 100}%`,
+                        backgroundColor: '#059669'
+                      }
+                    ]}
+                  />
+                </View>
               </View>
-              <Text style={styles.storageLabel}>Audio Tours ({storageUsage.audioTours}MB)</Text>
-            </View>
-            
-            <View style={styles.storageItem}>
-              <View style={styles.storageBar}>
-                <View
-                  style={[
-                    styles.storageBarFill,
-                    {
-                      width: `${(storageUsage.arAssets / storageUsage.totalSize) * 100}%`,
-                      backgroundColor: '#7C3AED'
-                    }
-                  ]}
-                />
+              
+              <View style={styles.storageItem}>
+                <View style={styles.storageItemHeader}>
+                  <View style={[styles.storageColorDot, { backgroundColor: '#F59E0B' }]} />
+                  <Text style={styles.storageItemTitle}>Audio Tours</Text>
+                  <Text style={styles.storageItemSize}>{storageUsage.audioTours}MB</Text>
+                </View>
+                <View style={styles.storageBar}>
+                  <View
+                    style={[
+                      styles.storageBarFill,
+                      {
+                        width: `${(storageUsage.audioTours / storageUsage.totalSize) * 100}%`,
+                        backgroundColor: '#F59E0B'
+                      }
+                    ]}
+                  />
+                </View>
               </View>
-              <Text style={styles.storageLabel}>AR Assets ({storageUsage.arAssets}MB)</Text>
+              
+              <View style={styles.storageItem}>
+                <View style={styles.storageItemHeader}>
+                  <View style={[styles.storageColorDot, { backgroundColor: '#7C3AED' }]} />
+                  <Text style={styles.storageItemTitle}>AR Assets</Text>
+                  <Text style={styles.storageItemSize}>{storageUsage.arAssets}MB</Text>
+                </View>
+                <View style={styles.storageBar}>
+                  <View
+                    style={[
+                      styles.storageBarFill,
+                      {
+                        width: `${(storageUsage.arAssets / storageUsage.totalSize) * 100}%`,
+                        backgroundColor: '#7C3AED'
+                      }
+                    ]}
+                  />
+                </View>
+              </View>
             </View>
           </View>
         </View>
-      </View>
 
-      {/* App Settings */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>App Settings</Text>
-        <TouchableOpacity style={styles.settingItem}>
-          <Ionicons name="language-outline" size={24} color="#6B7280" />
-          <View style={styles.settingContent}>
-            <Text style={styles.settingTitle}>Language</Text>
-            <Text style={styles.settingValue}>{preferences.language}</Text>
+        {/* Enhanced App Settings */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Personalization</Text>
+          <View style={styles.settingsCard}>
+            {renderSettingItem(
+              'Language & Region',
+              `${preferences.language} (${preferences.currency})`,
+              'globe-outline',
+              () => {},
+              '#059669'
+            )}
+            {renderSettingItem(
+              'App Theme',
+              preferences.theme.charAt(0).toUpperCase() + preferences.theme.slice(1),
+              'color-palette-outline',
+              () => {},
+              '#7C3AED'
+            )}
+            {renderSettingItem(
+              'Measurement Units',
+              'Metric (km, °C)',
+              'calculator-outline',
+              () => {},
+              '#F59E0B'
+            )}
           </View>
-          <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
-        </TouchableOpacity>
-        
-        <TouchableOpacity style={styles.settingItem}>
-          <Ionicons name="card-outline" size={24} color="#6B7280" />
-          <View style={styles.settingContent}>
-            <Text style={styles.settingTitle}>Default Currency</Text>
-            <Text style={styles.settingValue}>{preferences.currency}</Text>
+        </View>
+
+        {/* Enhanced Data & Privacy */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Data & Privacy</Text>
+          <View style={styles.actionsCard}>
+            {renderActionItem(
+              'Export Travel Data',
+              'download-outline',
+              exportData,
+              '#059669'
+            )}
+            {renderActionItem(
+              'Privacy Settings',
+              'shield-outline',
+              () => {},
+              '#7C3AED'
+            )}
+            {renderActionItem(
+              'Data Usage Policy',
+              'document-text-outline',
+              () => {},
+              '#F59E0B'
+            )}
+            {renderActionItem(
+              'Account Security',
+              'lock-closed-outline',
+              () => {},
+              '#DC2626'
+            )}
           </View>
-          <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
-        </TouchableOpacity>
-        
-        <TouchableOpacity style={styles.settingItem}>
-          <Ionicons name="contrast-outline" size={24} color="#6B7280" />
-          <View style={styles.settingContent}>
-            <Text style={styles.settingTitle}>Theme</Text>
-            <Text style={styles.settingValue}>{preferences.theme}</Text>
+        </View>
+
+        {/* Enhanced Support */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Help & Support</Text>
+          <View style={styles.actionsCard}>
+            {renderActionItem(
+              'Help Center',
+              'help-circle-outline',
+              () => {},
+              '#64748B'
+            )}
+            {renderActionItem(
+              'Contact Support',
+              'chatbubble-outline',
+              () => {},
+              '#64748B'
+            )}
+            {renderActionItem(
+              'Send Feedback',
+              'thumbs-up-outline',
+              () => {},
+              '#64748B'
+            )}
+            {renderActionItem(
+              'Rate TripCraft AI',
+              'star-outline',
+              () => {},
+              '#F59E0B'
+            )}
           </View>
-          <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
-        </TouchableOpacity>
-      </View>
+        </View>
 
-      {/* Data & Privacy */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Data & Privacy</Text>
-        <TouchableOpacity style={styles.actionItem} onPress={exportData}>
-          <Ionicons name="download-outline" size={24} color="#2563EB" />
-          <Text style={styles.actionText}>Export My Data</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity style={styles.actionItem}>
-          <Ionicons name="shield-outline" size={24} color="#059669" />
-          <Text style={styles.actionText}>Privacy Policy</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity style={styles.actionItem}>
-          <Ionicons name="document-text-outline" size={24} color="#F59E0B" />
-          <Text style={styles.actionText}>Terms of Service</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Support */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Support</Text>
-        <TouchableOpacity style={styles.actionItem}>
-          <Ionicons name="help-circle-outline" size={24} color="#6B7280" />
-          <Text style={styles.actionText}>Help Center</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity style={styles.actionItem}>
-          <Ionicons name="mail-outline" size={24} color="#6B7280" />
-          <Text style={styles.actionText}>Contact Support</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity style={styles.actionItem}>
-          <Ionicons name="star-outline" size={24} color="#6B7280" />
-          <Text style={styles.actionText}>Rate TripCraft AI</Text>
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.footer}>
-        <Text style={styles.footerText}>TripCraft AI v1.0.0</Text>
-        <Text style={styles.footerSubtext}>Built with ❤️ for travelers</Text>
-      </View>
-    </ScrollView>
+        {/* Enhanced Footer */}
+        <View style={styles.footer}>
+          <View style={styles.footerContent}>
+            <Text style={styles.footerTitle}>TripCraft AI</Text>
+            <Text style={styles.footerVersion}>Version 1.0.0</Text>
+          </View>
+          <Text style={styles.footerTagline}>Crafting extraordinary journeys with AI ✨</Text>
+          
+          <View style={styles.socialLinks}>
+            <TouchableOpacity style={styles.socialButton}>
+              <Ionicons name="logo-twitter" size={18} color="#64748B" />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.socialButton}>
+              <Ionicons name="logo-instagram" size={18} color="#64748B" />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.socialButton}>
+              <Ionicons name="mail-outline" size={18} color="#64748B" />
+            </TouchableOpacity>
+          </View>
+        </View>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F8FAFC',
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: 20,
   },
   header: {
-    paddingHorizontal: 24,
     paddingTop: 60,
-    paddingBottom: 32,
+    paddingBottom: 24,
+    paddingHorizontal: 20,
   },
   profileSection: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  avatar: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
+  avatarContainer: {
+    position: 'relative',
     marginRight: 16,
+  },
+  avatar: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    borderWidth: 3,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  avatarEditButton: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#059669',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
   },
   profileInfo: {
     flex: 1,
   },
   profileName: {
-    fontSize: 20,
-    fontWeight: '700',
+    fontSize: 24,
+    fontWeight: '800',
     color: '#FFFFFF',
     marginBottom: 4,
+    letterSpacing: -0.5,
   },
   profileEmail: {
     fontSize: 14,
     color: '#FFFFFF',
-    opacity: 0.8,
-    marginBottom: 8,
+    opacity: 0.9,
+    marginBottom: 12,
+    fontWeight: '500',
   },
   profileBadge: {
+    alignSelf: 'flex-start',
+  },
+  badgeGradient: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.2)',
     paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
-    alignSelf: 'flex-start',
+    paddingVertical: 6,
+    borderRadius: 16,
   },
   profileBadgeText: {
     color: '#FFFFFF',
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '700',
     marginLeft: 4,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
-  editButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+  settingsButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   section: {
-    paddingHorizontal: 24,
-    marginBottom: 32,
+    paddingHorizontal: 20,
+    marginTop: 32,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -465,84 +658,136 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 16,
   },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#111827',
+  sectionHeaderWithAction: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 16,
   },
-  clearCacheButton: {
+  sectionTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#1E293B',
+    letterSpacing: -0.5,
+  },
+  viewAllText: {
     fontSize: 14,
-    color: '#DC2626',
+    color: '#059669',
     fontWeight: '600',
   },
   statsGrid: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     justifyContent: 'space-between',
     marginBottom: 20,
   },
   statCard: {
-    width: '48%',
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#FFFFFF',
+    width: '23%',
     padding: 16,
-    borderRadius: 12,
+    borderRadius: 16,
     alignItems: 'center',
-    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 4,
   },
-  statIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+  statIconGradient: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 12,
   },
   statValue: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#111827',
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#1E293B',
     marginBottom: 4,
+    letterSpacing: -0.5,
   },
   statTitle: {
-    fontSize: 12,
-    color: '#6B7280',
+    fontSize: 11,
+    color: '#64748B',
     textAlign: 'center',
-  },
-  additionalStats: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    backgroundColor: '#F0F9FF',
-    padding: 16,
-    borderRadius: 12,
-  },
-  additionalStat: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  additionalStatLabel: {
-    fontSize: 12,
-    color: '#2563EB',
     fontWeight: '600',
-    marginBottom: 4,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
-  additionalStatValue: {
+  achievementCard: {
+    marginTop: 4,
+  },
+  achievementGradient: {
+    padding: 20,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  achievementHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  achievementIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#FEF3C7',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  achievementContent: {
+    flex: 1,
+  },
+  achievementTitle: {
     fontSize: 16,
-    color: '#1F2937',
     fontWeight: '700',
+    color: '#1E293B',
+    marginBottom: 2,
+  },
+  achievementSubtitle: {
+    fontSize: 14,
+    color: '#64748B',
+    fontWeight: '500',
+  },
+  achievementBadges: {
+    flexDirection: 'row',
+  },
+  miniBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginRight: 8,
+  },
+  miniBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  preferencesCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 4,
   },
   preferenceItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+    borderBottomColor: '#F1F5F9',
   },
   preferenceIcon: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#EFF6FF',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 16,
@@ -553,96 +798,234 @@ const styles = StyleSheet.create({
   preferenceTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#111827',
+    color: '#1E293B',
     marginBottom: 2,
   },
   preferenceDescription: {
-    fontSize: 14,
-    color: '#6B7280',
+    fontSize: 13,
+    color: '#64748B',
     lineHeight: 18,
+    fontWeight: '500',
+  },
+  clearCacheButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF2F2',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+  },
+  clearCacheText: {
+    fontSize: 13,
+    color: '#DC2626',
+    fontWeight: '600',
+    marginLeft: 4,
   },
   storageCard: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#FFFFFF',
     padding: 20,
     borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 4,
   },
   storageHeader: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 24,
   },
-  storageTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#111827',
-    marginLeft: 12,
+  storageMainInfo: {
+    flex: 1,
   },
-  storageBreakdown: {
-    marginTop: 16,
-  },
-  storageItem: {
-    marginBottom: 16,
-  },
-  storageBar: {
-    height: 8,
-    backgroundColor: '#E5E7EB',
-    borderRadius: 4,
-    marginBottom: 8,
-  },
-  storageBarFill: {
-    height: '100%',
-    borderRadius: 4,
+  storageSize: {
+    fontSize: 32,
+    fontWeight: '800',
+    color: '#1E293B',
+    letterSpacing: -1,
+    marginBottom: 4,
   },
   storageLabel: {
     fontSize: 14,
-    color: '#6B7280',
+    color: '#64748B',
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  storageCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  storageCircleInner: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#059669',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  storagePercentage: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  storageBreakdown: {
+    marginTop: 8,
+  },
+  storageItem: {
+    marginBottom: 20,
+  },
+  storageItemHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  storageColorDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 10,
+  },
+  storageItemTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#374151',
+    flex: 1,
+  },
+  storageItemSize: {
+    fontSize: 13,
+    color: '#64748B',
+    fontWeight: '600',
+  },
+  storageBar: {
+    height: 6,
+    backgroundColor: '#F1F5F9',
+    borderRadius: 3,
+    marginLeft: 18,
+  },
+  storageBarFill: {
+    height: '100%',
+    borderRadius: 3,
+  },
+  settingsCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 4,
   },
   settingItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+    borderBottomColor: '#F1F5F9',
+  },
+  settingIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 16,
   },
   settingContent: {
     flex: 1,
-    marginLeft: 16,
   },
   settingTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#111827',
+    color: '#1E293B',
+    marginBottom: 2,
   },
   settingValue: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginTop: 2,
+    fontSize: 13,
+    color: '#64748B',
+    fontWeight: '500',
+  },
+  actionsCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 4,
   },
   actionItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+    borderBottomColor: '#F1F5F9',
+  },
+  actionIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 16,
   },
   actionText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#111827',
-    marginLeft: 16,
+    color: '#1E293B',
+    flex: 1,
   },
   footer: {
     alignItems: 'center',
     paddingVertical: 40,
+    paddingHorizontal: 20,
+    marginTop: 20,
   },
-  footerText: {
-    fontSize: 14,
-    color: '#6B7280',
+  footerContent: {
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  footerTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#1E293B',
+    letterSpacing: -0.5,
+    marginBottom: 4,
+  },
+  footerVersion: {
+    fontSize: 13,
+    color: '#64748B',
     fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
-  footerSubtext: {
-    fontSize: 12,
-    color: '#9CA3AF',
-    marginTop: 4,
+  footerTagline: {
+    fontSize: 14,
+    color: '#64748B',
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 20,
+    fontWeight: '500',
   },
-});
+  socialLinks: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  socialButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginHorizontal: 8,
+  },
+})
