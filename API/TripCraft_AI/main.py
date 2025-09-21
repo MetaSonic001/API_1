@@ -20,6 +20,7 @@ from api.multimodal import router as multimodal_router
 from api.realtime import router as realtime_router
 from config.settings import get_settings
 from utils.logger import setup_logger
+from services.ollama_manager import ollama_manager
 
 # Setup logger
 logger = setup_logger()
@@ -41,6 +42,14 @@ async def lifespan(app: FastAPI):
     
     # Initialize services on startup with error handling
     try:
+        # Warm up Ollama model first
+        try:
+            logger.info("Warming up Ollama model...")
+            await ollama_manager.ensure_model_ready()
+            logger.info("Ollama model ready for use")
+        except Exception as e:
+            logger.warning(f"Ollama warm-up failed (non-critical): {e}")
+        
         # Try to initialize core services but don't fail if they're not available
         try:
             from tools.vector_store import VectorStore

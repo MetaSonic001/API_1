@@ -6,6 +6,7 @@ from typing import Dict, Any, List, Optional
 import httpx
 import json
 from config.settings import get_settings
+from services.llm_manager import llm_manager
 
 class BaseAgent(ABC):
     def __init__(self, name: str, role: str, model: str = None):
@@ -15,24 +16,23 @@ class BaseAgent(ABC):
         self.model = model or self.settings.OLLAMA_MODEL
         
     async def call_ollama(self, prompt: str, system_prompt: str = "") -> str:
-        """Call Ollama API"""
+        """Call LLM API with three-tier fallback: Groq → Gemini → Ollama"""
         try:
-            async with httpx.AsyncClient() as client:
-                response = await client.post(
-                    f"{self.settings.OLLAMA_BASE_URL}/api/generate",
-                    json={
-                        "model": self.model,
-                        "prompt": prompt,
-                        "system": system_prompt,
-                        "stream": False
-                    },
-                    timeout=60.0
-                )
-                if response.status_code == 200:
-                    return response.json().get("response", "")
+            result = await llm_manager.generate_text(
+                prompt=prompt,
+                system_prompt=system_prompt,
+                max_tokens=800,  # Reasonable limit for travel agents
+                temperature=0.7
+            )
+            
+            if result["success"]:
+                return result["content"]
+            else:
+                print(f"All LLM providers failed: {result['errors']}")
                 return ""
+                
         except Exception as e:
-            print(f"Ollama API error: {e}")
+            print(f"Base agent LLM error: {e}")
             return ""
     
     @abstractmethod

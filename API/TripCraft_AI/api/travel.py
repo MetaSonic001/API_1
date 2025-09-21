@@ -71,12 +71,18 @@ async def get_travel_plan(trip_id: str, request: Request) -> TravelPlanResponse:
         # Get client IP for rate limiting
         client_ip = request.client.host if request.client else "unknown"
         
-        # Check rate limit
-        if not check_rate_limit(client_ip):
-            logger.warning(f"Rate limit exceeded for {client_ip} requesting {trip_id}")
-            raise HTTPException(status_code=429, detail="Too many requests")
+        # Block spam IP temporarily
+        spam_ips = ["103.139.247.91"]
+        if client_ip in spam_ips:
+            logger.warning(f"Blocked spam IP: {client_ip}")
+            raise HTTPException(status_code=403, detail="IP blocked due to excessive requests")
         
-        logger.info(f"Fetching travel plan: {trip_id}")
+        # TEMPORARILY DISABLED - Check rate limit
+        # if not check_rate_limit(client_ip):
+        #     logger.warning(f"Rate limit exceeded for {client_ip} requesting {trip_id}")
+        #     raise HTTPException(status_code=429, detail="Too many requests")
+        
+        logger.info(f"Fetching travel plan: {trip_id} from IP: {client_ip}")
         
         # Check if it's a demo plan
         if trip_id.startswith("demo-"):
