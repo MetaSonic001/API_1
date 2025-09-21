@@ -105,7 +105,16 @@ export default function TripDetailsScreen() {
     try {
       setLoading(true);
       
-      // Demo trip data - in a real app, this would call the API
+      // Try to fetch real data from API first
+      try {
+        const realData = await api.getTripDetails(id!);
+        setTripDetails(realData);
+        return; // Success - exit early
+      } catch (apiError) {
+        console.log('API fetch failed, using demo data:', apiError);
+      }
+      
+      // Fallback to demo trip data
       const demoTrip: TripDetails = {
         trip_id: id!,
         destination_info: {
@@ -209,19 +218,33 @@ export default function TripDetailsScreen() {
   };
 
   const setupWebSocket = () => {
+    // Don't create multiple WebSocket connections
+    if (websocket && websocket.readyState === WebSocket.OPEN) {
+      return;
+    }
+    
     if (id) {
-      const ws = api.createWebSocketConnection(id);
-      
-      ws.onmessage = (event) => {
-        const update = JSON.parse(event.data);
-        handleRealtimeUpdate(update);
-      };
-      
-      ws.onerror = (error) => {
-        console.error('WebSocket error:', error);
-      };
-      
-      setWebsocket(ws);
+      try {
+        const ws = api.createWebSocketConnection(id);
+        
+        ws.onmessage = (event) => {
+          const update = JSON.parse(event.data);
+          handleRealtimeUpdate(update);
+        };
+        
+        ws.onerror = (error) => {
+          console.error('WebSocket error:', error);
+        };
+        
+        ws.onclose = () => {
+          console.log('WebSocket connection closed');
+          // Don't automatically reconnect to prevent connection spam
+        };
+        
+        setWebsocket(ws);
+      } catch (error) {
+        console.error('Failed to create WebSocket connection:', error);
+      }
     }
   };
 

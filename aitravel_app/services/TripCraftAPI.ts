@@ -140,7 +140,22 @@ export class TripCraftAPI {
 
   // WebSocket connection for real-time updates
   createWebSocketConnection(tripId: string): WebSocket {
-    return new WebSocket(`ws://localhost:8000/api/v1/realtime/ws/${tripId}`);
+    const wsUrl = this.baseUrl.replace('http://', 'ws://').replace('https://', 'wss://');
+    const ws = new WebSocket(`${wsUrl}/api/v1/realtime/ws/${tripId}`);
+    
+    ws.onopen = () => {
+      console.log(`WebSocket connected for trip ${tripId}`);
+    };
+    
+    ws.onclose = () => {
+      console.log(`WebSocket disconnected for trip ${tripId}`);
+    };
+    
+    ws.onerror = (error) => {
+      console.error(`WebSocket error for trip ${tripId}:`, error);
+    };
+    
+    return ws;
   }
 
   // AR-specific endpoints

@@ -93,3 +93,6 @@ config.json
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Qdrant persistent storage
+qdrant_storage/

@@ -65,24 +65,42 @@ class LLMClientFallback:
                 "error": f"All backends failed. Ollama: {ollama_error}"
             }
     
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
+    @retry(stop=stop_after_attempt(2), wait=wait_exponential(multiplier=1, min=2, max=5))
     async def _call_ollama(self, prompt: str, max_tokens: int, temperature: float) -> str:
-        """Call Ollama API with retry logic"""
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            response = await client.post(
-                f"{self.ollama_url}/api/generate",
-                json={
-                    "model": self.settings.OLLAMA_MODEL,
-                    "prompt": prompt,
-                    "stream": False,
-                    "options": {
-                        "num_predict": max_tokens,
-                        "temperature": temperature
+        """Call Ollama API with retry logic and better error handling"""
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                # First check if Ollama is running
+                health_response = await client.get(f"{self.ollama_url}/api/tags", timeout=5.0)
+                if health_response.status_code != 200:
+                    raise Exception("Ollama service not available")
+                
+                response = await client.post(
+                    f"{self.ollama_url}/api/generate",
+                    json={
+                        "model": self.settings.OLLAMA_MODEL,
+                        "prompt": prompt,
+                        "stream": False,
+                        "options": {
+                            "num_predict": max_tokens,
+                            "temperature": temperature
+                        }
                     }
-                }
-            )
-            response.raise_for_status()
-            return response.json()["response"]
+                )
+                response.raise_for_status()
+                result = response.json()
+                
+                if "response" not in result:
+                    raise Exception("Invalid response from Ollama")
+                    
+                return result["response"]
+                
+        except httpx.TimeoutException:
+            raise Exception("Ollama request timed out")
+        except httpx.ConnectError:
+            raise Exception("Cannot connect to Ollama service")
+        except Exception as e:
+            raise Exception(f"Ollama API error: {str(e)}")
     
     async def _call_huggingface(self, prompt: str, max_tokens: int, temperature: float) -> str:
         """Call HuggingFace Inference API"""
