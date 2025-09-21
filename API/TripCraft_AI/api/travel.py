@@ -9,8 +9,6 @@ from models.travel_response import TravelPlanResponse, ReplanningRequest
 from services.travel_service import TravelPlanningService
 from utils.logger import get_logger
 from fastapi.responses import Response
-import time
-from collections import defaultdict
 
 logger = get_logger(__name__)
 router = APIRouter()
@@ -18,25 +16,7 @@ router = APIRouter()
 # Initialize service
 travel_service = TravelPlanningService()
 
-# Simple rate limiting
-rate_limit_store = defaultdict(list)
-RATE_LIMIT_REQUESTS = 10  # requests per minute
-RATE_LIMIT_WINDOW = 60  # seconds
-
-def check_rate_limit(client_ip: str) -> bool:
-    """Simple rate limiting check"""
-    now = time.time()
-    # Clean old requests
-    rate_limit_store[client_ip] = [req_time for req_time in rate_limit_store[client_ip] 
-                                   if now - req_time < RATE_LIMIT_WINDOW]
-    
-    # Check if under limit
-    if len(rate_limit_store[client_ip]) >= RATE_LIMIT_REQUESTS:
-        return False
-    
-    # Add current request
-    rate_limit_store[client_ip].append(now)
-    return True
+# Rate limiting and IP blocking removed per user request
 
 @router.post("/plan", response_model=TravelPlanResponse)
 async def create_travel_plan(
@@ -68,19 +48,8 @@ async def create_travel_plan(
 async def get_travel_plan(trip_id: str, request: Request) -> TravelPlanResponse:
     """Get existing travel plan by ID"""
     try:
-        # Get client IP for rate limiting
+        # Get client IP for logging
         client_ip = request.client.host if request.client else "unknown"
-        
-        # Block spam IP temporarily
-        spam_ips = ["103.139.247.91"]
-        if client_ip in spam_ips:
-            logger.warning(f"Blocked spam IP: {client_ip}")
-            raise HTTPException(status_code=403, detail="IP blocked due to excessive requests")
-        
-        # TEMPORARILY DISABLED - Check rate limit
-        # if not check_rate_limit(client_ip):
-        #     logger.warning(f"Rate limit exceeded for {client_ip} requesting {trip_id}")
-        #     raise HTTPException(status_code=429, detail="Too many requests")
         
         logger.info(f"Fetching travel plan: {trip_id} from IP: {client_ip}")
         
@@ -277,23 +246,10 @@ async def quick_start_planning(location: Optional[str] = None):
         logger.error(f"Error in quick start: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/rate-limit-status")
-async def get_rate_limit_status(request: Request):
-    """Get current rate limit status for client"""
-    client_ip = request.client.host if request.client else "unknown"
-    now = time.time()
-    
-    # Count recent requests
-    recent_requests = [req_time for req_time in rate_limit_store[client_ip] 
-                      if now - req_time < RATE_LIMIT_WINDOW]
-    
-    return {
-        "client_ip": client_ip,
-        "requests_in_last_minute": len(recent_requests),
-        "rate_limit": RATE_LIMIT_REQUESTS,
-        "window_seconds": RATE_LIMIT_WINDOW,
-        "requests_remaining": max(0, RATE_LIMIT_REQUESTS - len(recent_requests))
-    }
+
+@router.get("/quick-start")
+async def quick_start_plan(location: Optional[str] = None) -> TravelPlanResponse:
+    """Generate quick start travel plan for immediate exploration"""
     try:
         # Create quick start request
         request = TravelPlanningRequest(
