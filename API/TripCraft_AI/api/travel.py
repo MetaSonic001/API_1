@@ -9,6 +9,8 @@ from models.travel_response import TravelPlanResponse, ReplanningRequest
 from services.travel_service import TravelPlanningService
 from utils.logger import get_logger
 from fastapi.responses import Response
+import json
+from datetime import datetime
 
 logger = get_logger(__name__)
 router = APIRouter()
@@ -16,7 +18,9 @@ router = APIRouter()
 # Initialize service
 travel_service = TravelPlanningService()
 
-# Rate limiting and IP blocking removed per user request
+# In-memory storage for travel plans (for development/demo purposes)
+# In production, this should be replaced with a proper database
+travel_plans_storage: Dict[str, Dict[str, Any]] = {}
 
 @router.post("/plan", response_model=TravelPlanResponse)
 async def create_travel_plan(
@@ -29,6 +33,13 @@ async def create_travel_plan(
         
         # Create travel plan
         response = await travel_service.create_travel_plan(request)
+        
+        # Store the travel plan for later retrieval
+        travel_plans_storage[response.trip_id] = {
+            "plan": response.model_dump(),
+            "created_at": datetime.now().isoformat(),
+            "request": request.model_dump()
+        }
         
         # Add background task for additional processing if needed
         background_tasks.add_task(
@@ -57,10 +68,18 @@ async def get_travel_plan(trip_id: str, request: Request) -> TravelPlanResponse:
         if trip_id.startswith("demo-"):
             return await _get_demo_plan(trip_id)
         
-        # For now, return a basic error since storage isn't implemented
-        # In a real implementation, this would fetch from database
-        logger.warning(f"Travel plan storage not implemented yet for: {trip_id}")
-        raise HTTPException(status_code=404, detail=f"Plan {trip_id} not found - storage not implemented")
+        # Check if plan exists in storage
+        if trip_id in travel_plans_storage:
+            stored_plan = travel_plans_storage[trip_id]
+            logger.info(f"Travel plan found in storage: {trip_id}")
+            
+            # Convert back to TravelPlanResponse object
+            plan_data = stored_plan["plan"]
+            return TravelPlanResponse(**plan_data)
+        
+        # Plan not found
+        logger.warning(f"Travel plan not found: {trip_id}")
+        raise HTTPException(status_code=404, detail=f"Plan {trip_id} not found")
         
     except HTTPException:
         # Re-raise HTTP exceptions
@@ -388,3 +407,26 @@ async def _post_process_plan(trip_id: str, realtime_enabled: bool):
         # Additional processing logic here
     except Exception as e:
         logger.error(f"Error in post-processing: {e}")
+
+@router.get("/plans/debug")
+async def list_stored_plans():
+    """Debug endpoint to list all stored travel plans"""
+    try:
+        plan_summaries = []
+        for trip_id, stored_data in travel_plans_storage.items():
+            plan_info = stored_data["plan"]
+            plan_summaries.append({
+                "trip_id": trip_id,
+                "destination": plan_info.get("destination_info", {}).get("name", "Unknown"),
+                "created_at": stored_data["created_at"],
+                "duration_days": plan_info.get("total_duration_days", 0)
+            })
+        
+        return JSONResponse(content={
+            "total_plans": len(travel_plans_storage),
+            "plans": plan_summaries
+        })
+    
+    except Exception as e:
+        logger.error(f"Error listing stored plans: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
